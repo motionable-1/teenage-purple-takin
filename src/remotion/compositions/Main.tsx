@@ -33,9 +33,6 @@ const COLORS = {
 // Assets
 const SCREENSHOT_URL =
   "https://pub-e3bfc0083b0644b296a7080b21024c5f.r2.dev/screenshots/1770733285214_2g1skptgwns_screenshot_url_1770733285214.png";
-const MAGIC_IMAGE_URL =
-  "https://v3b.fal.media/files/b/0a8dede7/vfvFXOC5V4HBy7Vn_-mEy_tT0U61Em.png";
-
 // Load fonts
 const { fontFamily: outfitFont } = loadOutfit();
 const { fontFamily: spaceGroteskFont } = loadSpaceGrotesk();
@@ -495,54 +492,6 @@ const AnimatedBrowser: React.FC<{ startFrame: number; endFrame: number }> = ({
 };
 
 // ============================================
-// Magic Background Image
-// ============================================
-const MagicBackground: React.FC<{ startFrame: number; endFrame: number }> = ({
-  startFrame,
-  endFrame,
-}) => {
-  const frame = useCurrentFrame();
-
-  const fadeIn = interpolate(frame, [startFrame, startFrame + 30], [0, 0.6], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const fadeOut = interpolate(frame, [endFrame - 30, endFrame], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const scale = interpolate(frame, [startFrame, endFrame], [1.1, 1.25], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  const opacity = fadeIn * fadeOut;
-
-  return (
-    <div
-      style={{
-        position: "absolute",
-        inset: -100,
-        opacity,
-        transform: `scale(${scale})`,
-      }}
-    >
-      <Img
-        src={MAGIC_IMAGE_URL}
-        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: `radial-gradient(circle at 50% 50%, transparent 0%, ${COLORS.background} 70%)`,
-        }}
-      />
-    </div>
-  );
-};
-
-// ============================================
 // CTA Button with Glow
 // ============================================
 const CTAButton: React.FC<{ startFrame: number }> = ({ startFrame }) => {
@@ -674,12 +623,6 @@ export const Main: React.FC = () => {
         speed={0.4}
         type="dust"
         style={{ opacity: 0.5 }}
-      />
-
-      {/* Magic background image (fades in during AI section) */}
-      <MagicBackground
-        startFrame={TIMELINE.magicStart}
-        endFrame={TIMELINE.magicEnd}
       />
 
       {/* Camera wrapper for subtle movement */}
