@@ -1,13 +1,11 @@
 import {
   AbsoluteFill,
   Img,
-  Sequence,
   useCurrentFrame,
   useVideoConfig,
   interpolate,
   Easing,
   spring,
-  Audio,
   Artifact,
 } from "remotion";
 import { loadFont as loadOutfit } from "@remotion/google-fonts/Outfit";
@@ -17,7 +15,6 @@ import {
   getPresentation,
   createTiming,
   StompStream,
-  SwipeStream,
   ElasticStream,
   TextAnimation,
   Camera,
@@ -42,9 +39,9 @@ const COLORS = {
 
 // Assets
 const SCREENSHOT_URL =
-  "https://pub-e3bfc0083b0644b296a7080b21024c5f.r2.dev/uploads/1770732987808_5p8y8xshqrk_superlinks_screenshot.png";
+  "https://pub-e3bfc0083b0644b296a7080b21024c5f.r2.dev/screenshots/1770733285214_2g1skptgwns_screenshot_url_1770733285214.png";
 const MAGIC_IMAGE_URL =
-  "https://pub-e3bfc0083b0644b296a7080b21024c5f.r2.dev/uploads/1770733005216_hk4wl6oklod_superlinks_magic_moment.png";
+  "https://v3b.fal.media/files/b/0a8dec93/Yd2qw877E3cuVTBKjt-TC_IzIBPrBw.png";
 
 // Load fonts
 const { fontFamily: outfitFont } = loadOutfit();
@@ -54,20 +51,16 @@ const { fontFamily: spaceGroteskFont } = loadSpaceGrotesk();
 // Scene 1: Hook - Bold Statement
 // ============================================
 const HookScene: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
-
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
       {/* Animated gradient background */}
       <FourColorGradient
-        colors={[
-          { color: "#F56B3D", x: 0.2, y: 0.3 },
-          { color: "#FF8C66", x: 0.8, y: 0.2 },
-          { color: "#09090B", x: 0.5, y: 0.8 },
-          { color: "#1a1a1a", x: 0.3, y: 0.7 },
-        ]}
-        animation="rotate"
+        topLeft="#F56B3D"
+        topRight="#FF8C66"
+        bottomLeft="#09090B"
+        bottomRight="#1a1a1a"
+        animate
+        animationType="rotate"
         speed={0.3}
         style={{ opacity: 0.4 }}
       />
@@ -75,9 +68,10 @@ const HookScene: React.FC = () => {
       {/* Floating particles */}
       <Particles
         count={30}
-        color={COLORS.primary}
-        size={{ min: 2, max: 6 }}
+        colors={[COLORS.primary, COLORS.accent]}
+        size={[2, 6]}
         speed={0.5}
+        type="dust"
         style={{ opacity: 0.6 }}
       />
 
@@ -104,7 +98,6 @@ const HookScene: React.FC = () => {
 // ============================================
 const AmplifyScene: React.FC = () => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
 
   const textOpacity = interpolate(frame, [0, 15], [0, 1], {
     extrapolateRight: "clamp",
@@ -175,7 +168,6 @@ const AmplifyScene: React.FC = () => {
 // ============================================
 const ProblemScene: React.FC = () => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
 
   const problems = [
     { icon: "📊", text: "Scattered Analytics", delay: 0 },
@@ -335,13 +327,13 @@ const SolutionScene: React.FC = () => {
               transformStyle: "preserve-3d",
             }}
           >
-            <Glow color={COLORS.primary} intensity={0.4} size={80}>
+            <Glow color={COLORS.primary} intensity={80}>
               <BrowserMockup
                 url="superlinks.ai"
-                type="arc"
+                browser="arc"
                 theme="light"
                 width={900}
-                shadow="2xl"
+                shadow
               >
                 <Img
                   src={SCREENSHOT_URL}
@@ -376,13 +368,12 @@ const FeaturesScene: React.FC = () => {
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
       <FourColorGradient
-        colors={[
-          { color: COLORS.primary, x: 0.1, y: 0.1 },
-          { color: "#FF8C66", x: 0.9, y: 0.2 },
-          { color: COLORS.background, x: 0.5, y: 0.9 },
-          { color: "#1a1a2e", x: 0.8, y: 0.8 },
-        ]}
-        animation="pulse"
+        topLeft={COLORS.primary}
+        topRight="#FF8C66"
+        bottomLeft={COLORS.background}
+        bottomRight="#1a1a2e"
+        animate
+        animationType="pulse"
         speed={0.4}
         style={{ opacity: 0.3 }}
       />
@@ -541,9 +532,10 @@ const MagicScene: React.FC = () => {
 
       <Particles
         count={50}
-        color={COLORS.primary}
-        size={{ min: 2, max: 5 }}
+        colors={[COLORS.primary, COLORS.accent]}
+        size={[2, 5]}
         speed={0.8}
+        type="sparks"
         style={{ opacity: 0.5 }}
       />
 
@@ -588,8 +580,6 @@ const MagicScene: React.FC = () => {
 // Scene 7: Tagline
 // ============================================
 const TaglineScene: React.FC = () => {
-  const frame = useCurrentFrame();
-
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.dark }}>
       <LinearGradient
@@ -603,8 +593,8 @@ const TaglineScene: React.FC = () => {
 
       <Particles
         count={25}
-        color={COLORS.primary}
-        size={{ min: 3, max: 8 }}
+        colors={[COLORS.primary, COLORS.accent, "#FFD700"]}
+        size={[3, 8]}
         speed={0.4}
         type="confetti"
         style={{ opacity: 0.5 }}
@@ -655,18 +645,16 @@ const CTAScene: React.FC = () => {
 
   // Button pulse
   const pulseScale = 1 + Math.sin(frame * 0.15) * 0.03;
-  const glowIntensity = 0.4 + Math.sin(frame * 0.1) * 0.2;
 
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
       <FourColorGradient
-        colors={[
-          { color: COLORS.primary, x: 0.5, y: 0.3 },
-          { color: "#FF8C66", x: 0.7, y: 0.5 },
-          { color: COLORS.background, x: 0.3, y: 0.8 },
-          { color: "#1a1a2e", x: 0.6, y: 0.7 },
-        ]}
-        animation="morph"
+        topLeft={COLORS.primary}
+        topRight="#FF8C66"
+        bottomLeft={COLORS.background}
+        bottomRight="#1a1a2e"
+        animate
+        animationType="shift"
         speed={0.5}
         style={{ opacity: 0.25 }}
       />
@@ -704,7 +692,12 @@ const CTAScene: React.FC = () => {
               transform: `translateY(${buttonY}px) scale(${pulseScale})`,
             }}
           >
-            <Glow color={COLORS.primary} intensity={glowIntensity} size={40}>
+            <Glow
+              color={COLORS.primary}
+              intensity={40}
+              pulsate
+              pulseDuration={1.5}
+            >
               <div
                 style={{
                   background: COLORS.primary,
@@ -745,7 +738,6 @@ const CTAScene: React.FC = () => {
 // ============================================
 export const Main: React.FC = () => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
 
   // Scene durations in frames (30fps)
   const SCENE_DURATIONS = {
@@ -764,7 +756,7 @@ export const Main: React.FC = () => {
   return (
     <>
       {frame === 0 && (
-        <Artifact content={Artifact.Thumbnail} filename="thumbnail.jpeg" />
+        <Artifact filename="thumbnail.jpeg" content={Artifact.Thumbnail} />
       )}
 
       <AbsoluteFill>
