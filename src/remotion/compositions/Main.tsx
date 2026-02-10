@@ -34,7 +34,7 @@ const COLORS = {
 const SCREENSHOT_URL =
   "https://pub-e3bfc0083b0644b296a7080b21024c5f.r2.dev/screenshots/1770733285214_2g1skptgwns_screenshot_url_1770733285214.png";
 const MAGIC_IMAGE_URL =
-  "https://v3b.fal.media/files/b/0a8dec93/Yd2qw877E3cuVTBKjt-TC_IzIBPrBw.png";
+  "https://v3b.fal.media/files/b/0a8dede7/vfvFXOC5V4HBy7Vn_-mEy_tT0U61Em.png";
 
 // Load fonts
 const { fontFamily: outfitFont } = loadOutfit();
