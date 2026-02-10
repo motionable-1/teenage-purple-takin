@@ -6,23 +6,16 @@ import {
   interpolate,
   Easing,
   spring,
-  Artifact,
 } from "remotion";
 import { loadFont as loadOutfit } from "@remotion/google-fonts/Outfit";
 import { loadFont as loadSpaceGrotesk } from "@remotion/google-fonts/SpaceGrotesk";
 import {
-  TransitionSeries,
-  getPresentation,
-  createTiming,
-  StompStream,
-  ElasticStream,
   TextAnimation,
   Camera,
   BrowserMockup,
   Particles,
   Glow,
   FourColorGradient,
-  LinearGradient,
 } from "../library";
 
 // Brand Colors
@@ -48,799 +41,921 @@ const { fontFamily: outfitFont } = loadOutfit();
 const { fontFamily: spaceGroteskFont } = loadSpaceGrotesk();
 
 // ============================================
-// Scene 1: Hook - Bold Statement
+// Animated Text Component - Flies in/out
 // ============================================
-const HookScene: React.FC = () => {
+interface FlyingTextProps {
+  children: React.ReactNode;
+  startFrame: number;
+  endFrame: number;
+  direction?: "up" | "down" | "left" | "right";
+  style?: React.CSSProperties;
+  exitDirection?: "up" | "down" | "left" | "right";
+  stayVisible?: boolean;
+}
+
+const FlyingText: React.FC<FlyingTextProps> = ({
+  children,
+  startFrame,
+  endFrame,
+  direction = "up",
+  exitDirection,
+  style,
+  stayVisible = false,
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const enterDuration = 20;
+  const exitDuration = 15;
+
+  // Entry animation
+  const entryProgress = spring({
+    frame: frame - startFrame,
+    fps,
+    config: { damping: 15, stiffness: 100 },
+    durationInFrames: enterDuration,
+  });
+
+  // Exit animation
+  const exitStart = endFrame - exitDuration;
+  const exitProgress = stayVisible
+    ? 0
+    : interpolate(frame, [exitStart, endFrame], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: Easing.in(Easing.cubic),
+      });
+
+  const getOffset = (dir: string, progress: number, isExit: boolean) => {
+    const distance = isExit ? 80 : 120;
+    const value = isExit ? progress * distance : (1 - progress) * distance;
+    switch (dir) {
+      case "up":
+        return { x: 0, y: isExit ? -value : value };
+      case "down":
+        return { x: 0, y: isExit ? value : -value };
+      case "left":
+        return { x: isExit ? -value : value, y: 0 };
+      case "right":
+        return { x: isExit ? value : -value, y: 0 };
+      default:
+        return { x: 0, y: value };
+    }
+  };
+
+  const entryOffset = getOffset(direction, entryProgress, false);
+  const exitOffset = getOffset(exitDirection || direction, exitProgress, true);
+
+  const isVisible = frame >= startFrame && (stayVisible || frame <= endFrame);
+  const opacity = isVisible
+    ? interpolate(entryProgress, [0, 0.3], [0, 1], {
+        extrapolateRight: "clamp",
+      }) *
+      (1 - exitProgress)
+    : 0;
+
+  const scale = interpolate(entryProgress, [0, 1], [0.9, 1], {
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.back(1.2)),
+  });
+
   return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
-      {/* Animated gradient background */}
-      <FourColorGradient
-        topLeft="#F56B3D"
-        topRight="#FF8C66"
-        bottomLeft="#09090B"
-        bottomRight="#1a1a1a"
-        animate
-        animationType="rotate"
-        speed={0.3}
-        style={{ opacity: 0.4 }}
-      />
-
-      {/* Floating particles */}
-      <Particles
-        count={30}
-        colors={[COLORS.primary, COLORS.accent]}
-        size={[2, 6]}
-        speed={0.5}
-        type="dust"
-        style={{ opacity: 0.6 }}
-      />
-
-      <Camera wiggle={0.02} wiggleSpeed={0.5}>
-        <AbsoluteFill className="flex items-center justify-center">
-          <div style={{ fontFamily: spaceGroteskFont }}>
-            <StompStream
-              text="Create Launch Monetize"
-              wordsPerGroup={1}
-              fontSize={110}
-              fontWeight={800}
-              color={COLORS.text}
-              transitionDuration={0.25}
-            />
-          </div>
-        </AbsoluteFill>
-      </Camera>
-    </AbsoluteFill>
+    <div
+      style={{
+        position: "absolute",
+        transform: `translate(${entryOffset.x + exitOffset.x}px, ${entryOffset.y + exitOffset.y}px) scale(${scale})`,
+        opacity,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
   );
 };
 
 // ============================================
-// Scene 2: Amplify Hook
+// Animated Element - Generic flying wrapper
 // ============================================
-const AmplifyScene: React.FC = () => {
+interface FlyingElementProps {
+  children: React.ReactNode;
+  startFrame: number;
+  endFrame?: number;
+  fromX?: number;
+  fromY?: number;
+  toX?: number;
+  toY?: number;
+  fromScale?: number;
+  toScale?: number;
+  fromRotation?: number;
+  toRotation?: number;
+  style?: React.CSSProperties;
+  stayVisible?: boolean;
+}
+
+const FlyingElement: React.FC<FlyingElementProps> = ({
+  children,
+  startFrame,
+  endFrame = 9999,
+  fromX = 0,
+  fromY = 100,
+  toX = 0,
+  toY = 0,
+  fromScale = 0.8,
+  toScale = 1,
+  fromRotation = 0,
+  toRotation = 0,
+  style,
+  stayVisible = true,
+}) => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
-  const textOpacity = interpolate(frame, [0, 15], [0, 1], {
-    extrapolateRight: "clamp",
-  });
-  const textY = interpolate(frame, [0, 20], [40, 0], {
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
+  const enterProgress = spring({
+    frame: frame - startFrame,
+    fps,
+    config: { damping: 14, stiffness: 90 },
+    durationInFrames: 25,
   });
 
-  const subOpacity = interpolate(frame, [15, 30], [0, 1], {
-    extrapolateRight: "clamp",
-  });
-  const subY = interpolate(frame, [15, 35], [30, 0], {
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
+  const exitProgress =
+    !stayVisible && frame > endFrame - 20
+      ? interpolate(frame, [endFrame - 20, endFrame], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+          easing: Easing.in(Easing.cubic),
+        })
+      : 0;
+
+  const x =
+    interpolate(enterProgress, [0, 1], [fromX, toX]) - exitProgress * 100;
+  const y =
+    interpolate(enterProgress, [0, 1], [fromY, toY]) - exitProgress * 80;
+  const scale =
+    interpolate(enterProgress, [0, 1], [fromScale, toScale]) *
+    (1 - exitProgress * 0.3);
+  const rotation = interpolate(
+    enterProgress,
+    [0, 1],
+    [fromRotation, toRotation],
+  );
+  const opacity =
+    frame >= startFrame
+      ? interpolate(enterProgress, [0, 0.2], [0, 1], {
+          extrapolateRight: "clamp",
+        }) *
+        (1 - exitProgress)
+      : 0;
 
   return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.dark }}>
-      <LinearGradient
-        colors={[
-          { color: COLORS.primary, position: 0 },
-          { color: "#FF8C66", position: 50 },
-          { color: COLORS.background, position: 100 },
-        ]}
-        direction="to-bottom-right"
-        style={{ opacity: 0.15 }}
-      />
-
-      <Camera wiggle={0.015} wiggleSpeed={0.4}>
-        <AbsoluteFill className="flex flex-col items-center justify-center gap-6">
-          <div
-            style={{
-              fontFamily: spaceGroteskFont,
-              fontSize: 72,
-              fontWeight: 700,
-              color: COLORS.text,
-              opacity: textOpacity,
-              transform: `translateY(${textY}px)`,
-              textAlign: "center",
-            }}
-          >
-            With <span style={{ color: COLORS.primary }}>Zero Code</span>{" "}
-            Required
-          </div>
-
-          <div
-            style={{
-              fontFamily: outfitFont,
-              fontSize: 32,
-              fontWeight: 400,
-              color: "rgba(250, 250, 250, 0.7)",
-              opacity: subOpacity,
-              transform: `translateY(${subY}px)`,
-              textAlign: "center",
-            }}
-          >
-            AI-powered platform for creators
-          </div>
-        </AbsoluteFill>
-      </Camera>
-    </AbsoluteFill>
+    <div
+      style={{
+        position: "absolute",
+        transform: `translate(${x}px, ${y}px) scale(${scale}) rotate(${rotation}deg)`,
+        opacity,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
   );
 };
 
 // ============================================
-// Scene 3: Problem Statement
+// Word Flipper - Words that flip/change in place
 // ============================================
-const ProblemScene: React.FC = () => {
-  const frame = useCurrentFrame();
+interface WordFlipperProps {
+  words: string[];
+  startFrame: number;
+  frameDuration: number;
+  style?: React.CSSProperties;
+  fontSize?: number;
+  color?: string;
+}
 
+const WordFlipper: React.FC<WordFlipperProps> = ({
+  words,
+  startFrame,
+  frameDuration,
+  style,
+  fontSize = 80,
+  color = COLORS.text,
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const localFrame = frame - startFrame;
+  if (localFrame < 0) return null;
+
+  const currentIndex = Math.min(
+    Math.floor(localFrame / frameDuration),
+    words.length - 1,
+  );
+  const frameInWord = localFrame % frameDuration;
+
+  const flipProgress = spring({
+    frame: frameInWord,
+    fps,
+    config: { damping: 12, stiffness: 150 },
+    durationInFrames: 12,
+  });
+
+  const scale = interpolate(flipProgress, [0, 0.5, 1], [0.7, 1.1, 1], {
+    extrapolateRight: "clamp",
+  });
+  const rotateX = interpolate(flipProgress, [0, 1], [-90, 0], {
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.back(1.5)),
+  });
+  const opacity = interpolate(flipProgress, [0, 0.3], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <div
+      style={{
+        fontFamily: spaceGroteskFont,
+        fontSize,
+        fontWeight: 800,
+        color,
+        transform: `scale(${scale}) perspective(500px) rotateX(${rotateX}deg)`,
+        opacity,
+        textShadow: `0 0 40px ${COLORS.primary}60`,
+        ...style,
+      }}
+    >
+      {words[currentIndex]}
+    </div>
+  );
+};
+
+// ============================================
+// Problem Cards - Fly in one by one
+// ============================================
+const ProblemCards: React.FC<{ startFrame: number; endFrame: number }> = ({
+  startFrame,
+  endFrame,
+}) => {
   const problems = [
-    { icon: "📊", text: "Scattered Analytics", delay: 0 },
-    { icon: "💳", text: "Multiple Payment Tools", delay: 8 },
-    { icon: "📧", text: "Separate Email Lists", delay: 16 },
-    { icon: "🔗", text: "Disconnected Products", delay: 24 },
+    { icon: "📊", text: "Scattered Analytics", x: -280, y: -60 },
+    { icon: "💳", text: "Multiple Payments", x: 280, y: -60 },
+    { icon: "📧", text: "Separate Emails", x: -280, y: 60 },
+    { icon: "🔗", text: "Disconnected Tools", x: 280, y: 60 },
   ];
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#0F0F11" }}>
-      {/* Red warning gradient */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 50% 50%, rgba(239, 68, 68, 0.15), transparent 60%)",
-        }}
-      />
+    <>
+      {problems.map((problem, i) => {
+        const delay = i * 8;
+        const cardStart = startFrame + delay;
+        const cardEnd = endFrame;
 
-      <Camera wiggle={0.025} wiggleSpeed={0.6}>
-        <AbsoluteFill className="flex flex-col items-center justify-center gap-8">
-          <TextAnimation
-            createTimeline={({ textRef, tl, SplitText }) => {
-              const split = new SplitText(textRef.current, { type: "chars" });
-              tl.from(split.chars, {
-                opacity: 0,
-                y: 30,
-                rotateX: -90,
-                stagger: 0.02,
-                duration: 0.4,
-                ease: "back.out(1.4)",
-              });
-              return tl;
-            }}
+        return (
+          <FlyingElement
+            key={i}
+            startFrame={cardStart}
+            endFrame={cardEnd}
+            fromX={problem.x * 2}
+            fromY={problem.y + 200}
+            toX={problem.x}
+            toY={problem.y}
+            fromScale={0.5}
+            toScale={1}
+            fromRotation={problem.x > 0 ? 15 : -15}
+            toRotation={0}
+            stayVisible={false}
             style={{
-              fontFamily: spaceGroteskFont,
-              fontSize: 56,
-              fontWeight: 700,
-              color: COLORS.text,
-              textAlign: "center",
+              left: "50%",
+              top: "50%",
+              marginLeft: -100,
+              marginTop: -30,
             }}
           >
-            Still juggling{" "}
-            <span style={{ color: COLORS.error }}>10+ tools</span>?
-          </TextAnimation>
-
-          <div
-            className="flex flex-wrap justify-center gap-4 mt-8"
-            style={{ maxWidth: 900 }}
-          >
-            {problems.map((problem, i) => {
-              const itemOpacity = interpolate(
-                frame,
-                [problem.delay, problem.delay + 10],
-                [0, 1],
-                { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-              );
-              const itemScale = interpolate(
-                frame,
-                [problem.delay, problem.delay + 12],
-                [0.8, 1],
-                {
-                  extrapolateLeft: "clamp",
-                  extrapolateRight: "clamp",
-                  easing: Easing.out(Easing.back(1.5)),
-                },
-              );
-              const shake =
-                frame > problem.delay + 15
-                  ? Math.sin((frame - problem.delay) * 0.3) * 2
-                  : 0;
-
-              return (
-                <div
-                  key={i}
-                  style={{
-                    opacity: itemOpacity,
-                    transform: `scale(${itemScale}) translateX(${shake}px)`,
-                    background: "rgba(239, 68, 68, 0.1)",
-                    border: "1px solid rgba(239, 68, 68, 0.3)",
-                    borderRadius: 12,
-                    padding: "16px 24px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                  }}
-                >
-                  <span style={{ fontSize: 28 }}>{problem.icon}</span>
-                  <span
-                    style={{
-                      fontFamily: outfitFont,
-                      fontSize: 20,
-                      fontWeight: 500,
-                      color: COLORS.text,
-                    }}
-                  >
-                    {problem.text}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </AbsoluteFill>
-      </Camera>
-    </AbsoluteFill>
-  );
-};
-
-// ============================================
-// Scene 4: Solution Reveal - Browser Mockup
-// ============================================
-const SolutionScene: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const browserScale = spring({
-    frame,
-    fps,
-    config: { damping: 15, stiffness: 80 },
-    durationInFrames: 30,
-  });
-
-  const browserY = interpolate(frame, [0, 30], [60, 0], {
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-
-  const rotateX = interpolate(frame, [0, 40], [15, 5], {
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-
-  const rotateY = interpolate(frame, [0, 40], [-8, -3], {
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-
-  return (
-    <AbsoluteFill style={{ backgroundColor: "#FAFAFA" }}>
-      {/* Light gradient */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 30% 20%, rgba(245, 107, 61, 0.1), transparent 50%)",
-        }}
-      />
-
-      <Camera wiggle={0.01} wiggleSpeed={0.3}>
-        <AbsoluteFill
-          className="flex items-center justify-center"
-          style={{ perspective: 1200 }}
-        >
-          <div
-            style={{
-              transform: `scale(${browserScale}) translateY(${browserY}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
-              transformStyle: "preserve-3d",
-            }}
-          >
-            <Glow color={COLORS.primary} intensity={80}>
-              <BrowserMockup
-                url="superlinks.ai"
-                browser="arc"
-                theme="light"
-                width={900}
-                shadow
+            <div
+              style={{
+                background: "rgba(239, 68, 68, 0.15)",
+                border: "1px solid rgba(239, 68, 68, 0.4)",
+                borderRadius: 16,
+                padding: "14px 24px",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                backdropFilter: "blur(10px)",
+                boxShadow: "0 8px 32px rgba(239, 68, 68, 0.2)",
+              }}
+            >
+              <span style={{ fontSize: 28 }}>{problem.icon}</span>
+              <span
+                style={{
+                  fontFamily: outfitFont,
+                  fontSize: 18,
+                  fontWeight: 500,
+                  color: COLORS.text,
+                  whiteSpace: "nowrap",
+                }}
               >
-                <Img
-                  src={SCREENSHOT_URL}
-                  style={{ width: "100%", height: "auto" }}
-                />
-              </BrowserMockup>
-            </Glow>
-          </div>
-        </AbsoluteFill>
-      </Camera>
-    </AbsoluteFill>
+                {problem.text}
+              </span>
+            </div>
+          </FlyingElement>
+        );
+      })}
+    </>
   );
 };
 
 // ============================================
-// Scene 5: Feature Highlights
+// Feature Cards - Fly in elegantly
 // ============================================
-const FeaturesScene: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
+const FeatureCards: React.FC<{ startFrame: number; endFrame: number }> = ({
+  startFrame,
+  endFrame,
+}) => {
   const features = [
-    {
-      icon: "🎨",
-      title: "Digital Products",
-      desc: "Courses, templates, ebooks",
-    },
-    { icon: "📈", title: "Smart Analytics", desc: "Real-time insights" },
-    { icon: "💰", title: "Built-in Payments", desc: "Stripe integration" },
+    { icon: "🎨", title: "Digital Products", x: -300 },
+    { icon: "📈", title: "Smart Analytics", x: 0 },
+    { icon: "💰", title: "Built-in Payments", x: 300 },
   ];
 
   return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
-      <FourColorGradient
-        topLeft={COLORS.primary}
-        topRight="#FF8C66"
-        bottomLeft={COLORS.background}
-        bottomRight="#1a1a2e"
-        animate
-        animationType="pulse"
-        speed={0.4}
-        style={{ opacity: 0.3 }}
-      />
-
-      <Camera wiggle={0.02} wiggleSpeed={0.4}>
-        <AbsoluteFill className="flex flex-col items-center justify-center gap-12">
-          <TextAnimation
-            createTimeline={({ textRef, tl, SplitText }) => {
-              const split = new SplitText(textRef.current, { type: "words" });
-              tl.from(split.words, {
-                opacity: 0,
-                scale: 0.8,
-                y: 20,
-                stagger: 0.08,
-                duration: 0.5,
-                ease: "back.out(1.7)",
-              });
-              return tl;
-            }}
+    <>
+      {features.map((feature, i) => {
+        const delay = i * 10;
+        return (
+          <FlyingElement
+            key={i}
+            startFrame={startFrame + delay}
+            endFrame={endFrame}
+            fromX={feature.x}
+            fromY={250}
+            toX={feature.x}
+            toY={80}
+            fromScale={0.6}
+            toScale={1}
+            stayVisible={false}
             style={{
-              fontFamily: spaceGroteskFont,
-              fontSize: 52,
-              fontWeight: 700,
-              color: COLORS.text,
-              textAlign: "center",
+              left: "50%",
+              top: "50%",
+              marginLeft: -90,
+              marginTop: -60,
             }}
           >
-            Everything in{" "}
-            <span style={{ color: COLORS.primary }}>One Place</span>
-          </TextAnimation>
-
-          <div className="flex gap-8">
-            {features.map((feature, i) => {
-              const delay = 20 + i * 12;
-              const cardOpacity = interpolate(
-                frame,
-                [delay, delay + 12],
-                [0, 1],
-                {
-                  extrapolateLeft: "clamp",
-                  extrapolateRight: "clamp",
-                },
-              );
-              const cardY = interpolate(frame, [delay, delay + 15], [40, 0], {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-                easing: Easing.out(Easing.back(1.5)),
-              });
-              const cardScale = spring({
-                frame: Math.max(0, frame - delay),
-                fps,
-                config: { damping: 12, stiffness: 100 },
-              });
-
-              return (
-                <div
-                  key={i}
-                  style={{
-                    opacity: cardOpacity,
-                    transform: `translateY(${cardY}px) scale(${cardScale})`,
-                    background: "rgba(255, 255, 255, 0.05)",
-                    backdropFilter: "blur(10px)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    borderRadius: 20,
-                    padding: "32px 40px",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 16,
-                    minWidth: 220,
-                  }}
-                >
-                  <span style={{ fontSize: 48 }}>{feature.icon}</span>
-                  <span
-                    style={{
-                      fontFamily: spaceGroteskFont,
-                      fontSize: 24,
-                      fontWeight: 600,
-                      color: COLORS.text,
-                    }}
-                  >
-                    {feature.title}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: outfitFont,
-                      fontSize: 16,
-                      color: "rgba(250, 250, 250, 0.6)",
-                    }}
-                  >
-                    {feature.desc}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </AbsoluteFill>
-      </Camera>
-    </AbsoluteFill>
+            <div
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                backdropFilter: "blur(20px)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                borderRadius: 24,
+                padding: "28px 36px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 14,
+                minWidth: 180,
+                boxShadow: `0 20px 60px rgba(0,0,0,0.4), 0 0 40px ${COLORS.primary}20`,
+              }}
+            >
+              <span style={{ fontSize: 44 }}>{feature.icon}</span>
+              <span
+                style={{
+                  fontFamily: spaceGroteskFont,
+                  fontSize: 20,
+                  fontWeight: 600,
+                  color: COLORS.text,
+                  textAlign: "center",
+                }}
+              >
+                {feature.title}
+              </span>
+            </div>
+          </FlyingElement>
+        );
+      })}
+    </>
   );
 };
 
 // ============================================
-// Scene 6: Magic Moment - AI Visual
+// Browser Mockup Animation
 // ============================================
-const MagicScene: React.FC = () => {
+const AnimatedBrowser: React.FC<{ startFrame: number; endFrame: number }> = ({
+  startFrame,
+  endFrame,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const imageScale = spring({
-    frame,
+  const progress = spring({
+    frame: frame - startFrame,
     fps,
-    config: { damping: 20, stiffness: 60 },
-    durationInFrames: 40,
+    config: { damping: 14, stiffness: 60 },
+    durationInFrames: 35,
   });
 
-  const imageOpacity = interpolate(frame, [0, 20], [0, 1], {
+  const exitProgress = interpolate(frame, [endFrame - 25, endFrame], [0, 1], {
+    extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
+    easing: Easing.in(Easing.cubic),
   });
 
-  const textOpacity = interpolate(frame, [25, 40], [0, 1], {
-    extrapolateRight: "clamp",
-  });
-  const textY = interpolate(frame, [25, 45], [30, 0], {
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
+  const scale =
+    interpolate(progress, [0, 1], [0.3, 0.65]) * (1 - exitProgress * 0.5);
+  const y = interpolate(progress, [0, 1], [300, 40]) - exitProgress * 150;
+  const rotateX = interpolate(progress, [0, 1], [30, 8]) + exitProgress * 20;
+  const rotateY = interpolate(progress, [0, 1], [-20, -5]);
+  const opacity =
+    frame >= startFrame
+      ? interpolate(progress, [0, 0.3], [0, 1], { extrapolateRight: "clamp" }) *
+        (1 - exitProgress)
+      : 0;
 
   return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
-      {/* AI-generated background image */}
+    <div
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: `translate(-50%, -50%) translateY(${y}px) scale(${scale}) perspective(1200px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
+        opacity,
+        transformStyle: "preserve-3d",
+      }}
+    >
+      <Glow color={COLORS.primary} intensity={60}>
+        <BrowserMockup
+          url="superlinks.ai"
+          browser="arc"
+          theme="dark"
+          width={1100}
+          shadow
+        >
+          <Img src={SCREENSHOT_URL} style={{ width: "100%", height: "auto" }} />
+        </BrowserMockup>
+      </Glow>
+    </div>
+  );
+};
+
+// ============================================
+// Magic Background Image
+// ============================================
+const MagicBackground: React.FC<{ startFrame: number; endFrame: number }> = ({
+  startFrame,
+  endFrame,
+}) => {
+  const frame = useCurrentFrame();
+
+  const fadeIn = interpolate(frame, [startFrame, startFrame + 30], [0, 0.6], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const fadeOut = interpolate(frame, [endFrame - 30, endFrame], [1, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const scale = interpolate(frame, [startFrame, endFrame], [1.1, 1.25], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  const opacity = fadeIn * fadeOut;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: -100,
+        opacity,
+        transform: `scale(${scale})`,
+      }}
+    >
+      <Img
+        src={MAGIC_IMAGE_URL}
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+      />
       <div
         style={{
           position: "absolute",
           inset: 0,
-          opacity: imageOpacity * 0.8,
-          transform: `scale(${0.9 + imageScale * 0.15})`,
+          background: `radial-gradient(circle at 50% 50%, transparent 0%, ${COLORS.background} 70%)`,
         }}
-      >
-        <Img
-          src={MAGIC_IMAGE_URL}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
-        />
-        {/* Overlay gradient */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: `linear-gradient(to top, ${COLORS.background} 0%, transparent 50%, ${COLORS.background}80 100%)`,
-          }}
-        />
-      </div>
+      />
+    </div>
+  );
+};
 
+// ============================================
+// CTA Button with Glow
+// ============================================
+const CTAButton: React.FC<{ startFrame: number }> = ({ startFrame }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const progress = spring({
+    frame: frame - startFrame,
+    fps,
+    config: { damping: 12, stiffness: 80 },
+    durationInFrames: 30,
+  });
+
+  const pulse = 1 + Math.sin((frame - startFrame) * 0.12) * 0.04;
+  const glowPulse = 40 + Math.sin((frame - startFrame) * 0.1) * 15;
+
+  const opacity =
+    frame >= startFrame
+      ? interpolate(progress, [0, 0.5], [0, 1], { extrapolateRight: "clamp" })
+      : 0;
+  const y = interpolate(progress, [0, 1], [60, 0]);
+  const scale = interpolate(progress, [0, 1], [0.8, 1]) * pulse;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: `translate(-50%, -50%) translateY(${80 + y}px) scale(${scale})`,
+        opacity,
+      }}
+    >
+      <Glow
+        color={COLORS.primary}
+        intensity={glowPulse}
+        pulsate
+        pulseDuration={2}
+      >
+        <div
+          style={{
+            background: `linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.accent} 100%)`,
+            color: COLORS.text,
+            fontFamily: outfitFont,
+            fontSize: 26,
+            fontWeight: 600,
+            padding: "20px 56px",
+            borderRadius: 9999,
+            boxShadow: `0 0 60px ${COLORS.primary}80, 0 10px 40px rgba(0,0,0,0.4)`,
+            cursor: "pointer",
+          }}
+        >
+          Start for Free →
+        </div>
+      </Glow>
+    </div>
+  );
+};
+
+// ============================================
+// Main Composition - Single Canvas Flow
+// ============================================
+export const Main: React.FC = () => {
+  // Timeline (all on same canvas)
+  const TIMELINE = {
+    // Phase 1: Hook words (0-90)
+    hookStart: 0,
+    hookWords: 90,
+
+    // Phase 2: Subtext (60-150)
+    subtextStart: 60,
+    subtextEnd: 150,
+
+    // Phase 3: Problem (120-240)
+    problemTitleStart: 120,
+    problemTitleEnd: 200,
+    problemCardsStart: 150,
+    problemCardsEnd: 260,
+
+    // Phase 4: Solution transition (230-400)
+    solutionTitleStart: 240,
+    solutionTitleEnd: 320,
+    browserStart: 280,
+    browserEnd: 420,
+
+    // Phase 5: Features (380-520)
+    featuresTitleStart: 400,
+    featuresTitleEnd: 480,
+    featureCardsStart: 430,
+    featureCardsEnd: 540,
+
+    // Phase 6: Magic/AI moment (500-620)
+    magicStart: 520,
+    magicEnd: 640,
+    aiTextStart: 550,
+    aiTextEnd: 630,
+
+    // Phase 7: Tagline (600-720)
+    taglineStart: 620,
+    taglineEnd: 750,
+
+    // Phase 8: CTA (700+)
+    logoStart: 700,
+    ctaStart: 730,
+    subCtaStart: 760,
+  };
+
+  return (
+    <AbsoluteFill
+      style={{ backgroundColor: COLORS.background, overflow: "hidden" }}
+    >
+      {/* Base animated gradient - always present */}
+      <FourColorGradient
+        topLeft={COLORS.primary}
+        topRight="#FF8C66"
+        bottomLeft="#1a1a2e"
+        bottomRight={COLORS.background}
+        animate
+        animationType="shift"
+        speed={0.3}
+        style={{ opacity: 0.35 }}
+      />
+
+      {/* Floating particles - always present */}
       <Particles
-        count={50}
-        colors={[COLORS.primary, COLORS.accent]}
-        size={[2, 5]}
-        speed={0.8}
-        type="sparks"
+        count={40}
+        colors={[COLORS.primary, COLORS.accent, "#FFD700"]}
+        size={[2, 6]}
+        speed={0.4}
+        type="dust"
         style={{ opacity: 0.5 }}
       />
 
-      <Camera wiggle={0.02} wiggleSpeed={0.5}>
-        <AbsoluteFill className="flex flex-col items-center justify-end pb-24">
-          <div
+      {/* Magic background image (fades in during AI section) */}
+      <MagicBackground
+        startFrame={TIMELINE.magicStart}
+        endFrame={TIMELINE.magicEnd}
+      />
+
+      {/* Camera wrapper for subtle movement */}
+      <Camera wiggle={0.012} wiggleSpeed={0.3}>
+        <AbsoluteFill>
+          {/* ==================== PHASE 1: Hook ==================== */}
+          {/* Main hook words that flip */}
+          <FlyingElement
+            startFrame={TIMELINE.hookStart}
+            endFrame={TIMELINE.hookWords + 30}
+            fromY={50}
+            toY={0}
+            fromScale={0.9}
+            stayVisible={false}
             style={{
-              opacity: textOpacity,
-              transform: `translateY(${textY}px)`,
-              textAlign: "center",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            <WordFlipper
+              words={["Create.", "Launch.", "Monetize.", "Superlinks."]}
+              startFrame={TIMELINE.hookStart + 10}
+              frameDuration={22}
+              fontSize={120}
+              color={COLORS.text}
+              style={{ textAlign: "center" }}
+            />
+          </FlyingElement>
+
+          {/* ==================== PHASE 2: Subtext ==================== */}
+          <FlyingText
+            startFrame={TIMELINE.subtextStart}
+            endFrame={TIMELINE.subtextEnd}
+            direction="up"
+            style={{ left: "50%", top: "58%", transform: "translateX(-50%)" }}
+          >
+            <div
+              style={{
+                fontFamily: spaceGroteskFont,
+                fontSize: 48,
+                fontWeight: 600,
+                color: COLORS.text,
+                textAlign: "center",
+              }}
+            >
+              With <span style={{ color: COLORS.primary }}>Zero Code</span>{" "}
+              Required
+            </div>
+          </FlyingText>
+
+          <FlyingText
+            startFrame={TIMELINE.subtextStart + 15}
+            endFrame={TIMELINE.subtextEnd}
+            direction="up"
+            style={{ left: "50%", top: "68%", transform: "translateX(-50%)" }}
+          >
+            <div
+              style={{
+                fontFamily: outfitFont,
+                fontSize: 24,
+                color: "rgba(255,255,255,0.6)",
+              }}
+            >
+              AI-powered platform for creators
+            </div>
+          </FlyingText>
+
+          {/* ==================== PHASE 3: Problem ==================== */}
+          <FlyingText
+            startFrame={TIMELINE.problemTitleStart}
+            endFrame={TIMELINE.problemTitleEnd}
+            direction="down"
+            style={{ left: "50%", top: "28%", transform: "translateX(-50%)" }}
+          >
+            <div
+              style={{
+                fontFamily: spaceGroteskFont,
+                fontSize: 52,
+                fontWeight: 700,
+                color: COLORS.text,
+                textAlign: "center",
+              }}
+            >
+              Still juggling{" "}
+              <span style={{ color: COLORS.error }}>10+ tools</span>?
+            </div>
+          </FlyingText>
+
+          <ProblemCards
+            startFrame={TIMELINE.problemCardsStart}
+            endFrame={TIMELINE.problemCardsEnd}
+          />
+
+          {/* ==================== PHASE 4: Solution ==================== */}
+          <FlyingText
+            startFrame={TIMELINE.solutionTitleStart}
+            endFrame={TIMELINE.solutionTitleEnd}
+            direction="left"
+            exitDirection="up"
+            style={{ left: "50%", top: "22%", transform: "translateX(-50%)" }}
+          >
+            <div
+              style={{
+                fontFamily: spaceGroteskFont,
+                fontSize: 56,
+                fontWeight: 700,
+                color: COLORS.text,
+                textAlign: "center",
+              }}
+            >
+              Everything in{" "}
+              <span style={{ color: COLORS.primary }}>One Place</span>
+            </div>
+          </FlyingText>
+
+          <AnimatedBrowser
+            startFrame={TIMELINE.browserStart}
+            endFrame={TIMELINE.browserEnd}
+          />
+
+          {/* ==================== PHASE 5: Features ==================== */}
+          <FlyingText
+            startFrame={TIMELINE.featuresTitleStart}
+            endFrame={TIMELINE.featuresTitleEnd}
+            direction="right"
+            style={{ left: "50%", top: "20%", transform: "translateX(-50%)" }}
+          >
+            <div
+              style={{
+                fontFamily: spaceGroteskFont,
+                fontSize: 48,
+                fontWeight: 700,
+                color: COLORS.text,
+              }}
+            >
+              Built for <span style={{ color: COLORS.primary }}>Creators</span>
+            </div>
+          </FlyingText>
+
+          <FeatureCards
+            startFrame={TIMELINE.featureCardsStart}
+            endFrame={TIMELINE.featureCardsEnd}
+          />
+
+          {/* ==================== PHASE 6: AI/Magic ==================== */}
+          <FlyingText
+            startFrame={TIMELINE.aiTextStart}
+            endFrame={TIMELINE.aiTextEnd}
+            direction="up"
+            style={{ left: "50%", top: "45%", transform: "translateX(-50%)" }}
+          >
+            <div style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  fontFamily: spaceGroteskFont,
+                  fontSize: 72,
+                  fontWeight: 800,
+                  color: COLORS.text,
+                  textShadow: `0 0 60px ${COLORS.primary}80`,
+                }}
+              >
+                Powered by <span style={{ color: COLORS.primary }}>AI</span>
+              </div>
+              <div
+                style={{
+                  fontFamily: outfitFont,
+                  fontSize: 28,
+                  color: "rgba(255,255,255,0.7)",
+                  marginTop: 16,
+                }}
+              >
+                Build smarter. Launch faster.
+              </div>
+            </div>
+          </FlyingText>
+
+          {/* ==================== PHASE 7: Tagline ==================== */}
+          <FlyingElement
+            startFrame={TIMELINE.taglineStart}
+            endFrame={TIMELINE.taglineEnd}
+            fromY={100}
+            toY={-60}
+            fromScale={0.8}
+            stayVisible={false}
+            style={{
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            <TextAnimation
+              createTimeline={({ textRef, tl, SplitText }) => {
+                const split = new SplitText(textRef.current, { type: "words" });
+                tl.from(split.words, {
+                  opacity: 0,
+                  y: 60,
+                  rotateX: -90,
+                  stagger: 0.1,
+                  duration: 0.6,
+                  ease: "back.out(1.5)",
+                });
+                return tl;
+              }}
+              style={{
+                fontFamily: spaceGroteskFont,
+                fontSize: 64,
+                fontWeight: 800,
+                color: COLORS.text,
+                textAlign: "center",
+                lineHeight: 1.2,
+              }}
+            >
+              Turn Your Knowledge
+              <br />
+              <span style={{ color: COLORS.primary }}>Into Income</span>
+            </TextAnimation>
+          </FlyingElement>
+
+          {/* ==================== PHASE 8: CTA ==================== */}
+          {/* Logo */}
+          <FlyingElement
+            startFrame={TIMELINE.logoStart}
+            fromY={-80}
+            toY={-140}
+            fromScale={0.7}
+            style={{
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
             }}
           >
             <div
               style={{
                 fontFamily: spaceGroteskFont,
                 fontSize: 64,
-                fontWeight: 700,
-                color: COLORS.text,
-                textShadow: "0 4px 30px rgba(0,0,0,0.5)",
-              }}
-            >
-              Powered by <span style={{ color: COLORS.primary }}>AI</span>
-            </div>
-            <div
-              style={{
-                fontFamily: outfitFont,
-                fontSize: 24,
-                color: "rgba(250, 250, 250, 0.7)",
-                marginTop: 12,
-              }}
-            >
-              Build smarter, launch faster
-            </div>
-          </div>
-        </AbsoluteFill>
-      </Camera>
-    </AbsoluteFill>
-  );
-};
-
-// ============================================
-// Scene 7: Tagline
-// ============================================
-const TaglineScene: React.FC = () => {
-  return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.dark }}>
-      <LinearGradient
-        colors={[
-          { color: COLORS.primary, position: 0 },
-          { color: "#FF8C66", position: 100 },
-        ]}
-        direction="to-right"
-        style={{ opacity: 0.2 }}
-      />
-
-      <Particles
-        count={25}
-        colors={[COLORS.primary, COLORS.accent, "#FFD700"]}
-        size={[3, 8]}
-        speed={0.4}
-        type="confetti"
-        style={{ opacity: 0.5 }}
-      />
-
-      <Camera wiggle={0.015} wiggleSpeed={0.4}>
-        <AbsoluteFill className="flex items-center justify-center">
-          <div style={{ fontFamily: spaceGroteskFont }}>
-            <ElasticStream
-              text="Turn Your Knowledge Into Income"
-              wordsPerGroup={2}
-              fontSize={80}
-              fontWeight={800}
-              color={COLORS.text}
-              transitionDuration={0.3}
-            />
-          </div>
-        </AbsoluteFill>
-      </Camera>
-    </AbsoluteFill>
-  );
-};
-
-// ============================================
-// Scene 8: CTA + Logo
-// ============================================
-const CTAScene: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const logoOpacity = interpolate(frame, [0, 20], [0, 1], {
-    extrapolateRight: "clamp",
-  });
-  const logoScale = spring({
-    frame,
-    fps,
-    config: { damping: 12, stiffness: 100 },
-    durationInFrames: 25,
-  });
-
-  const buttonOpacity = interpolate(frame, [20, 35], [0, 1], {
-    extrapolateRight: "clamp",
-  });
-  const buttonY = interpolate(frame, [20, 40], [30, 0], {
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.back(1.5)),
-  });
-
-  // Button pulse
-  const pulseScale = 1 + Math.sin(frame * 0.15) * 0.03;
-
-  return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
-      <FourColorGradient
-        topLeft={COLORS.primary}
-        topRight="#FF8C66"
-        bottomLeft={COLORS.background}
-        bottomRight="#1a1a2e"
-        animate
-        animationType="shift"
-        speed={0.5}
-        style={{ opacity: 0.25 }}
-      />
-
-      <Camera wiggle={0.01} wiggleSpeed={0.3}>
-        <AbsoluteFill className="flex flex-col items-center justify-center gap-10">
-          {/* Logo / Brand Name */}
-          <div
-            style={{
-              opacity: logoOpacity,
-              transform: `scale(${logoScale})`,
-            }}
-          >
-            <div
-              style={{
-                fontFamily: spaceGroteskFont,
-                fontSize: 72,
                 fontWeight: 800,
                 color: COLORS.text,
                 display: "flex",
                 alignItems: "center",
-                gap: 16,
+                gap: 8,
               }}
             >
               <span style={{ color: COLORS.primary }}>Super</span>
               <span>links</span>
-              <span style={{ color: COLORS.primary, fontSize: 48 }}>.ai</span>
+              <span style={{ color: COLORS.primary, fontSize: 42 }}>.ai</span>
             </div>
-          </div>
+          </FlyingElement>
 
           {/* CTA Button */}
-          <div
-            style={{
-              opacity: buttonOpacity,
-              transform: `translateY(${buttonY}px) scale(${pulseScale})`,
-            }}
-          >
-            <Glow
-              color={COLORS.primary}
-              intensity={40}
-              pulsate
-              pulseDuration={1.5}
-            >
-              <div
-                style={{
-                  background: COLORS.primary,
-                  color: COLORS.text,
-                  fontFamily: outfitFont,
-                  fontSize: 24,
-                  fontWeight: 600,
-                  padding: "18px 48px",
-                  borderRadius: 9999,
-                  boxShadow: `0 0 40px ${COLORS.primary}80`,
-                }}
-              >
-                Start for Free →
-              </div>
-            </Glow>
-          </div>
+          <CTAButton startFrame={TIMELINE.ctaStart} />
 
-          {/* Tagline */}
-          <div
+          {/* Sub-CTA text */}
+          <FlyingText
+            startFrame={TIMELINE.subCtaStart}
+            endFrame={9999}
+            direction="up"
+            stayVisible
             style={{
-              opacity: buttonOpacity,
-              fontFamily: outfitFont,
-              fontSize: 18,
-              color: "rgba(250, 250, 250, 0.5)",
-              marginTop: 8,
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, 160px)",
             }}
           >
-            No credit card required
-          </div>
+            <div
+              style={{
+                fontFamily: outfitFont,
+                fontSize: 18,
+                color: "rgba(255,255,255,0.5)",
+              }}
+            >
+              No credit card required • Cancel anytime
+            </div>
+          </FlyingText>
         </AbsoluteFill>
       </Camera>
     </AbsoluteFill>
-  );
-};
-
-// ============================================
-// Main Composition
-// ============================================
-export const Main: React.FC = () => {
-  const frame = useCurrentFrame();
-
-  // Scene durations in frames (30fps)
-  const SCENE_DURATIONS = {
-    hook: 90, // 3s
-    amplify: 75, // 2.5s
-    problem: 100, // 3.3s
-    solution: 100, // 3.3s
-    features: 110, // 3.7s
-    magic: 100, // 3.3s
-    tagline: 90, // 3s
-    cta: 120, // 4s (longer for ending)
-  };
-
-  const TRANSITION_DURATION = 12; // 0.4s transitions
-
-  return (
-    <>
-      {frame === 0 && (
-        <Artifact filename="thumbnail.jpeg" content={Artifact.Thumbnail} />
-      )}
-
-      <AbsoluteFill>
-        <TransitionSeries>
-          {/* Scene 1: Hook */}
-          <TransitionSeries.Sequence durationInFrames={SCENE_DURATIONS.hook}>
-            <HookScene />
-          </TransitionSeries.Sequence>
-
-          <TransitionSeries.Transition
-            presentation={getPresentation("whipPan")}
-            timing={createTiming("snappy", TRANSITION_DURATION)}
-          />
-
-          {/* Scene 2: Amplify */}
-          <TransitionSeries.Sequence durationInFrames={SCENE_DURATIONS.amplify}>
-            <AmplifyScene />
-          </TransitionSeries.Sequence>
-
-          <TransitionSeries.Transition
-            presentation={getPresentation("glitch")}
-            timing={createTiming("snappy", TRANSITION_DURATION)}
-          />
-
-          {/* Scene 3: Problem */}
-          <TransitionSeries.Sequence durationInFrames={SCENE_DURATIONS.problem}>
-            <ProblemScene />
-          </TransitionSeries.Sequence>
-
-          <TransitionSeries.Transition
-            presentation={getPresentation("flashWhite")}
-            timing={createTiming("snappy", TRANSITION_DURATION)}
-          />
-
-          {/* Scene 4: Solution */}
-          <TransitionSeries.Sequence
-            durationInFrames={SCENE_DURATIONS.solution}
-          >
-            <SolutionScene />
-          </TransitionSeries.Sequence>
-
-          <TransitionSeries.Transition
-            presentation={getPresentation("zoomIn")}
-            timing={createTiming("smooth", TRANSITION_DURATION)}
-          />
-
-          {/* Scene 5: Features */}
-          <TransitionSeries.Sequence
-            durationInFrames={SCENE_DURATIONS.features}
-          >
-            <FeaturesScene />
-          </TransitionSeries.Sequence>
-
-          <TransitionSeries.Transition
-            presentation={getPresentation("blurDissolve")}
-            timing={createTiming("smooth", TRANSITION_DURATION)}
-          />
-
-          {/* Scene 6: Magic Moment */}
-          <TransitionSeries.Sequence durationInFrames={SCENE_DURATIONS.magic}>
-            <MagicScene />
-          </TransitionSeries.Sequence>
-
-          <TransitionSeries.Transition
-            presentation={getPresentation("slideUp")}
-            timing={createTiming("snappy", TRANSITION_DURATION)}
-          />
-
-          {/* Scene 7: Tagline */}
-          <TransitionSeries.Sequence durationInFrames={SCENE_DURATIONS.tagline}>
-            <TaglineScene />
-          </TransitionSeries.Sequence>
-
-          <TransitionSeries.Transition
-            presentation={getPresentation("morphCircle")}
-            timing={createTiming("smooth", TRANSITION_DURATION)}
-          />
-
-          {/* Scene 8: CTA */}
-          <TransitionSeries.Sequence durationInFrames={SCENE_DURATIONS.cta}>
-            <CTAScene />
-          </TransitionSeries.Sequence>
-        </TransitionSeries>
-      </AbsoluteFill>
-    </>
   );
 };
