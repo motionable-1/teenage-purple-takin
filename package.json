@@ -13,14 +13,16 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
-    "@remotion/google-fonts": "^4.0.414",
-    "@remotion/noise": "^4.0.414",
+    "@remotion/google-fonts": "^4.0.420",
+    "@remotion/noise": "^4.0.420",
+    "@remotion/paths": "^4.0.420",
     "@remotion/player": "^4.0.414",
-    "@remotion/transitions": "^4.0.414",
+    "@remotion/shapes": "^4.0.420",
+    "@remotion/transitions": "^4.0.420",
     "gsap": "^3.13.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "remotion": "^4.0.414"
+    "remotion": "^4.0.420"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^5.0.0",
