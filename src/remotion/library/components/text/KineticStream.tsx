@@ -3,7 +3,7 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import { toRemotionEasing } from "../../presets/remotionEasings";
 
 // ============================================
-// Shared Types
+// Shared Types - KineticStream Components
 // ============================================
 
 export interface KineticStreamProps {
